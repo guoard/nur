@@ -1,19 +1,47 @@
-{ fetchurl, lib, pkgs }:
+{ fetchurl, lib, pkgs, libepoxy, dpkg, makeWrapper, patchelf, harfbuzz, atk, cairo, gdk-pixbuf, glib, gtk3, ayatana-ido }:
 
 pkgs.stdenv.mkDerivation rec {
   name = "hiddify";
-  version = "1.4.0";
+  version = "1.6.3";
 
   src = fetchurl {
     url = "https://github.com/hiddify/hiddify-next/releases/download/v${version}/Hiddify-Debian-x64.deb";
-    sha256 = "dca0a36a31cc883aab39d46191989b6079fe2fc40d4ea4c9b20d152820b26a85";
+    sha256 = "sha256-V/M5Qjo0zD1+Hqo7rmudXDtRB1H6fai9jfy3ZSe02vA=";
   };
 
-  buildInputs = with pkgs;[
+
+  nativeBuildInputs = [
+    makeWrapper
     dpkg
+    pkgs.tree
   ];
 
-  unpackPhase = "dpkg-deb -x $src $out";
+  buildInputs = [ dpkg patchelf harfbuzz atk cairo gdk-pixbuf glib gtk3 ayatana-ido ];
+
+  runLibDeps = [ harfbuzz atk cairo gdk-pixbuf glib gtk3 ayatana-ido ];
+
+
+  runBinDeps = [
+    libepoxy
+  ];
+
+#   unpackPhase = "dpkg-deb -x $src $out";
+
+  installPhase = ''
+    runHook preInstall
+
+    mkdir -p $out
+    cp -r usr/share $out/share
+
+    mkdir -p $out/bin
+    cp usr/share/hiddify/hiddify $out/bin/hiddify
+
+    wrapProgram $out/bin/hiddify \
+      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath runLibDeps} \
+      --prefix PATH : ${lib.makeBinPath runBinDeps}
+
+    runHook postInstall
+  '';
 
   meta = with lib; {
     description = "A multi-platform proxy client based on Sing-box universal proxy tool-chain";
